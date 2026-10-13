@@ -1,0 +1,3 @@
+# 视频列表接口依赖 WBI 签名，curl_cffi（chrome TLS 指纹）可显著降低风控概率；
+# 缺失时脚本自动降级为 urllib 模式
+curl_cffi>=0.5,<1
