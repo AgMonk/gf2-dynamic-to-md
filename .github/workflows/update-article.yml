@@ -2,8 +2,8 @@ name: 每周更新（专栏）
 
 on:
   schedule:
-    # UTC 周一 02:00 = 北京时间周一 10:00，每周运行一次
-    - cron: "0 2 * * 1"
+    # UTC 周二 19:00 = 北京时间周三凌晨 3:00，每周运行一次
+    - cron: "0 19 * * 2"
   workflow_dispatch:
 
 permissions:
