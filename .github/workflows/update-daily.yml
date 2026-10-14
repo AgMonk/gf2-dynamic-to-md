@@ -2,8 +2,8 @@ name: 每日更新（动态/视频）
 
 on:
   schedule:
-    # UTC 18:00 = 北京时间凌晨 2:00，每天运行
-    - cron: "0 18 * * *"
+    # UTC 16:47 = 北京时间 0:47（错开整点高峰，减少调度延迟），每天运行
+    - cron: "47 16 * * *"
   workflow_dispatch:
 
 permissions:
