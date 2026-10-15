@@ -45,14 +45,25 @@ def read_table(path: str):
 
     rows 为 {列名: 单元格文本} 的列表（保持文件内顺序）。
     """
+    rows, columns, _ = read_table_raw(path)
+    return rows, columns
+
+
+def read_table_raw(path: str):
+    """读取 md 中的数据表，返回 (rows, columns, raw_lines)。
+
+    与 read_table 相同，但额外返回与 rows 一一对应的原始行文本，
+    供增量更新时字节级原样保留既有行。
+    """
     if not os.path.exists(path):
-        return [], []
+        return [], [], []
     with open(path, "r", encoding="utf-8") as f:
         lines = f.read().splitlines()
     for i, line in enumerate(lines):
         if line.startswith("|") and "登记时间" in line:
             columns = [c.strip() for c in _split_row(line)]
             rows = []
+            raw_lines = []
             for ln in lines[i + 2:]:
                 if not ln.startswith("|"):
                     break
@@ -60,19 +71,34 @@ def read_table(path: str):
                 if len(cells) != len(columns):
                     continue
                 rows.append(dict(zip(columns, cells)))
-            return rows, columns
-    return [], []
+                raw_lines.append(ln)
+            return rows, columns, raw_lines
+    return [], [], []
+
+
+def render_row(columns: list, row: dict) -> str:
+    """单行数据 → 表格行文本（与 write_table 的序列化规则一致）。"""
+    return "| " + " | ".join(esc_cell(str(row.get(c, "") or "")) for c in columns) + " |"
 
 
 def write_table(path: str, title: str, meta_lines: list, columns: list, rows: list):
-    """整表写入 md 文件。"""
+    """整表写入 md 文件（所有行重新序列化，仅用于全量重建）。"""
+    write_table_lines(path, title, meta_lines, columns,
+                      [render_row(columns, r) for r in rows])
+
+
+def write_table_lines(path: str, title: str, meta_lines: list, columns: list, lines: list):
+    """写盘：表头/meta 重新生成，表体直接使用给定的行文本。
+
+    lines 中既有行应为 read_table_raw 返回的原始行文本（字节级不变），
+    新增行用 render_row 生成。用于增量更新，避免既有行被重新序列化。
+    """
     out = [f"# {title}", ""]
     out += [f"- {m}" for m in meta_lines]
     out += ["",
             "| " + " | ".join(columns) + " |",
             "| " + " | ".join(["---"] * len(columns)) + " |"]
-    for r in rows:
-        out.append("| " + " | ".join(esc_cell(str(r.get(c, "") or "")) for c in columns) + " |")
+    out += lines
     out.append("")
     tmp = path + ".tmp"
     os.makedirs(os.path.dirname(path), exist_ok=True)
