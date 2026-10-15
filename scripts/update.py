@@ -13,7 +13,8 @@
   视频：BV号 / 标题 / 发布时间 / 视频链接 / 类型 / 登记时间
 
 行为：
-  - 增量模式按 opus_id / BV号 去重，已有记录保持原样（含登记时间）；
+  - 增量模式按 opus_id / BV号 去重，已有记录保持原样（含登记时间），
+    既有行字节级原样回写（不重新序列化、不因接口内容漂移而改写）；
   - 全量模式（--full）拉到接口末尾后整表重建，成功校验（拉完）才写盘；
   - 表内按发布先后倒序（最新在前）。
 """
@@ -130,7 +131,7 @@ def fetch_target(target: str, existing_ids: set, full: bool):
 def update_target(target: str, full: bool) -> bool:
     cfg = TARGETS[target]
     path = cfg["file"]
-    rows, _ = md_store.read_table(path)
+    rows, _, raw_lines = md_store.read_table_raw(path)
     existing_ids = {r.get(cfg["key"], "") for r in rows if r.get(cfg["key"])}
     print(f"== [{cfg['label']}] 已有 {len(rows)} 条，开始抓取（{'全量' if full else '增量'}） ==", flush=True)
 
@@ -158,15 +159,20 @@ def update_target(target: str, full: bool) -> bool:
         print(f"[{cfg['label']}] 本次拉取 {len(parsed)} 条，无新增，不写盘", flush=True)
         return True
 
+    # 合并排序：既有行原样保留原始文本（字节级不变），仅新增行序列化。
+    # 稳定排序保证同键时既有行相对顺序不变。
+    entries = [(sort_key(target, r), raw_lines[i]) for i, r in enumerate(rows)]
+    entries += [(sort_key(target, r), md_store.render_row(cfg["columns"], r)) for r in new_rows]
+    entries.sort(key=lambda e: e[0], reverse=True)
     merged = rows + new_rows
-    merged.sort(key=lambda r: sort_key(target, r), reverse=True)
+    lines = [e[1] for e in entries]
     meta = [
         f"数据源：[少女前线2：追放的B站空间]({SPACE_URL})（UID：{HOST_MID}）",
         f"数据接口：{cfg['api_note']}",
         f"最近更新：{md_store.now_cn()}（UTC+8）",
         f"记录数：{len(merged)}",
     ]
-    md_store.write_table(path, cfg["title"], meta, cfg["columns"], merged)
+    md_store.write_table_lines(path, cfg["title"], meta, cfg["columns"], lines)
     print(f"[{cfg['label']}] 新增 {len(new_rows)} 条，表内共 {len(merged)} 条 → {os.path.relpath(path, BASE_DIR)}", flush=True)
     return True
 
