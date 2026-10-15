@@ -35,6 +35,18 @@ def esc_cell(s: str) -> str:
     return s.replace("|", "\\|")
 
 
+# 原内容并非 md 格式，但 GitHub 渲染表格时会解析 md/HTML 语法：
+# ~ → 删除线、* → 强调、` → 行内代码、<xxx> → 被当作 HTML 标签吞掉。
+# 统一加反斜杠按字面显示。<br> 是本模块引入的换行表示，需跳过不转义；
+# _ 不转义（GFM 中词内下划线不触发斜体，且多见于正文链接 URL）。
+_MD_ESC_RE = re.compile(r"([~*`])|<(?!/?br>)")
+
+
+def esc_md(s: str) -> str:
+    """纯文本防渲染转义：~ * ` 和非 <br> 的 <，使 md 中按原字符显示。"""
+    return _MD_ESC_RE.sub(lambda m: "\\" + m.group(0), s)
+
+
 def _split_row(line: str) -> list:
     cells = re.split(r"(?<!\\)\|", line.strip())
     return [c.strip().replace("\\|", "|") for c in cells[1:-1]]

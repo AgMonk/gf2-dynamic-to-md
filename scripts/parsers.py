@@ -14,6 +14,8 @@
 import html
 import re
 
+import md_store
+
 # 从标签中删除的关键词（顺序敏感："少前2追放" 先于 "少前2"）
 TAGS_TO_STRIP = ("少前2追放", "少前2")
 
@@ -100,10 +102,11 @@ def parse_dynamic_item(item: dict) -> dict:
     body = strip_trailing_footer(body)
     return {
         "opus_id": str(item.get("opus_id", "") or ""),
-        "正文": body,
+        # 正文/标题/标签为纯文本，转义 md 触发符号避免被渲染（~ * ` <）
+        "正文": md_store.esc_md(body),
         "链接": normalize_link(item.get("jump_url", "")),
-        "标签": extract_tags(head),
-        "动态类型": extract_dynamic_type(head),
+        "标签": [md_store.esc_md(t) for t in extract_tags(head)],
+        "动态类型": md_store.esc_md(extract_dynamic_type(head)),
     }
 
 
@@ -111,7 +114,7 @@ def parse_article_item(item: dict) -> dict:
     """把 opus feed(type=article) 的条目解析为 md 行数据。"""
     return {
         "opus_id": str(item.get("opus_id", "") or ""),
-        "标题": item.get("content_preview", "") or item.get("content", "") or "",
+        "标题": md_store.esc_md(item.get("content_preview", "") or item.get("content", "") or ""),
         "链接": normalize_link(item.get("jump_url", "")),
     }
 
@@ -132,7 +135,7 @@ def parse_video_item(item: dict) -> dict:
     title = html.unescape(item.get("title", "") or "")
     return {
         "BV号": str(bvid),
-        "标题": title,
+        "标题": md_store.esc_md(title),
         "created": item.get("created"),
         "视频链接": f"https://www.bilibili.com/video/{bvid}" if bvid else "",
         "类型": classify_video_type(title),
