@@ -25,6 +25,7 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import fetch_article_detail
 import fetch_opus
 import fetch_video
 import md_store
@@ -186,6 +187,14 @@ def main():
     results = {t: update_target(t, args.full) for t in args.targets}
     for t, ok in results.items():
         print(f"结果 {TARGETS[t]['label']}: {'成功' if ok else '失败'}", flush=True)
+    # 专栏更新成功后补抓缺失详情（无缺失时仅扫描本地文件，不发起网络请求）
+    if results.get("article"):
+        try:
+            failed = fetch_article_detail.sync_from_table()
+            if failed:
+                print(f"专栏详情: {failed} 条抓取失败", flush=True)
+        except Exception as e:
+            print(f"专栏详情补抓异常: {e}", flush=True)
     # 全部失败才以非 0 退出（CI 中据此报警）
     sys.exit(0 if any(results.values()) else 1)
 
